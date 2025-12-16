@@ -6,42 +6,69 @@ form.addEventListener("submit", async (e) => {
 
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value.trim();
-
+  const captchaResponse = grecaptcha.getResponse();
+if (!captchaResponse) {
+  errorBox.textContent = "Please check the captcha.";
+  return;
+}
   // Validate empty fields
   if (!username || !password) {
     errorBox.textContent = "Please enter both username and password.";
     return;
   }
 
+
   try {
     // Send login request to Django API
-    const response = await fetch("http://localhost:8000/api/sessions/", {
+    const response = await fetch("/api/sessions/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({
+        username: username,
+        password: password,
+        "g-recaptcha-response": captchaResponse  
+      })
     });
-
-    // If login failed (401)
-    if (!response.ok) {
-      errorBox.style.color = "red";
-      errorBox.textContent = "Incorrect username or password.";
-      return;
-    }
-
+    
     // Parse response JSON (contains access + refresh tokens)
     const data = await response.json();
 
+    // If login failed (401)
+    if (!response.ok) {
+  errorBox.style.color = "red";
+  
+
+    //invalid-captcha
+  if (data.error === "invalid-captcha") {
+    errorBox.textContent = "Captcha validation failed. Please try again.";
+    grecaptcha.reset(); 
+  } else {
+    errorBox.textContent = "Incorrect username or password.";
+  }
+
+  return;
+   }
+
+
+
+
     // Store JWT tokens in localStorage
-    localStorage.setItem("access", data.access);
-    localStorage.setItem("refresh", data.refresh);
+localStorage.setItem("access_token", data.access);
+localStorage.setItem("refresh_token", data.refresh);
+console.log("ACCESS TOKEN:", data.access);
+document.cookie = `access_token=${data.access}; path=/`;
+alert(document.cookie);
+
+
+
 
     // Redirect after success
     errorBox.style.color = "blue";
     errorBox.textContent = "Login successful! Redirecting...";
     setTimeout(() => {
-      window.location.href = "dashboard.html";
+     window.location.href = "/dashboard/";
     }, 700);
 
   } catch (error) {
